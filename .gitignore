@@ -1,0 +1,7 @@
+dist/
+*.db
+__pycache__/
+*.pyc
+.env
+aay
+aay.exe

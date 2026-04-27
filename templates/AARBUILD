@@ -1,0 +1,90 @@
+# AARBUILD - Alpine AUR Paket Tanım Dosyası
+# Bu dosyayı paketinizin deposuna ekleyin
+
+pkgname="ornek-paket"
+pkgver="1.0.0"
+pkgrel="1"
+pkgdesc="Paketin kısa açıklaması"
+url="https://github.com/kullanici/proje"
+arch="x86_64 aarch64"
+license="MIT"
+
+# Çalışma bağımlılıkları
+depends=("curl" "bash")
+
+# Sadece derleme için bağımlılıklar
+makedepends=("go" "build-base")
+
+# Kaynak URL — ${pkgver} otomatik değiştirilir
+source="https://github.com/kullanici/proje/archive/v${pkgver}.tar.gz"
+sha256sum="SKIP"  # Üretimde gerçek hash kullanın
+
+# ──────────────────────────────────────────
+# Derleme fonksiyonu
+# ──────────────────────────────────────────
+build() {
+    echo "==> Derleniyor: ${pkgname} ${pkgver}"
+    cd "${pkgname}-${pkgver}" 2>/dev/null || true
+
+    # Go projesi örneği:
+    # go build -o ${pkgname} .
+
+    # C projesi örneği:
+    # ./configure --prefix=/usr
+    # make -j$(nproc)
+
+    # Python projesi örneği:
+    # pip install --target=./dist .
+
+    echo "==> Derleme tamamlandı"
+}
+
+# ──────────────────────────────────────────
+# Kurulum fonksiyonu
+# ──────────────────────────────────────────
+package() {
+    echo "==> Kuruluyor: ${pkgname}"
+    cd "${pkgname}-${pkgver}" 2>/dev/null || true
+
+    # Binary kurulumu
+    install -Dm755 "${pkgname}" "${pkgdir}/usr/local/bin/${pkgname}"
+
+    # Man sayfası (varsa)
+    # install -Dm644 "${pkgname}.1" "${pkgdir}/usr/share/man/man1/${pkgname}.1"
+
+    # Config dosyası (varsa)
+    # install -Dm644 "config.example" "${pkgdir}/etc/${pkgname}/config"
+
+    echo "==> Kurulum tamamlandı"
+}
+
+# ──────────────────────────────────────────
+# Çalıştır (AARBUILD doğrudan sh ile çalışır)
+# ──────────────────────────────────────────
+pkgdir="/tmp/aay-pkg/${pkgname}"
+mkdir -p "${pkgdir}"
+
+# Kaynağı indir
+if [ "${sha256sum}" != "SKIP" ]; then
+    curl -L "${source}" -o source.tar.gz
+    echo "${sha256sum}  source.tar.gz" | sha256sum -c || {
+        echo "HATA: Checksum uyuşmuyor!"
+        exit 1
+    }
+    tar xzf source.tar.gz
+else
+    curl -L "${source}" -o source.tar.gz 2>/dev/null && tar xzf source.tar.gz 2>/dev/null || true
+fi
+
+build
+package
+
+# Sisteme kopyala
+if [ -d "${pkgdir}/usr" ]; then
+    cp -r "${pkgdir}/usr" /
+fi
+if [ -d "${pkgdir}/etc" ]; then
+    cp -r "${pkgdir}/etc" /
+fi
+
+echo "==> ${pkgname} ${pkgver} kurulumu başarılı!"

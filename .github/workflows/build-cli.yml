@@ -1,0 +1,118 @@
+name: Build aay CLI
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }} / ${{ matrix.arch }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - os: linux
+            arch: amd64
+            output: aay-linux-amd64
+          - os: linux
+            arch: arm64
+            output: aay-linux-arm64
+          - os: linux
+            arch: "386"
+            output: aay-linux-386
+          # macOS
+          - os: darwin
+            arch: amd64
+            output: aay-darwin-amd64
+          - os: darwin
+            arch: arm64
+            output: aay-darwin-arm64
+          # Windows
+          - os: windows
+            arch: amd64
+            output: aay-windows-amd64.exe
+
+    steps:
+      - name: Kodu çek
+        uses: actions/checkout@v4
+
+      - name: Go kur
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Derle
+        working-directory: ./cli
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          go build \
+            -ldflags="-s -w -X main.VERSION=${{ github.ref_name }}" \
+            -o ../dist/${{ matrix.output }} \
+            .
+
+      - name: Binary'i artifact olarak kaydet
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+
+  release:
+    name: GitHub Release oluştur
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Tüm artifact'ları indir
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Dosyaları düzenle
+        run: |
+          find dist/ -type f | while read f; do
+            mv "$f" "dist/$(basename $f)"
+          done
+          ls -la dist/
+
+      - name: Checksum oluştur
+        run: |
+          cd dist
+          sha256sum aay-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Release yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "aay ${{ github.ref_name }}"
+          body: |
+            ## aay ${{ github.ref_name }}
+
+            ### Kurulum (Alpine Linux)
+            ```sh
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/aay-linux-amd64
+            chmod +x aay-linux-amd64
+            sudo mv aay-linux-amd64 /usr/local/bin/aay
+            ```
+
+            ### Değişiklikler
+            - Otomatik olarak oluşturuldu
+          files: |
+            dist/aay-*
+            dist/SHA256SUMS
+          draft: false
+          prerelease: false
